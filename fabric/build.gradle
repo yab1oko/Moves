@@ -1,0 +1,65 @@
+plugins {
+    id 'multiloader-loader'
+    id 'fabric-loom'
+}
+
+repositories {
+    maven {
+        name = "KosmX"
+        url = "https://maven.kosmx.dev/"
+    }
+}
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings loom.layered {
+        officialMojangMappings()
+        parchment("org.parchmentmc.data:parchment-${parchment_minecraft}:${parchment_version}@zip")
+    }
+    modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    implementation group: 'com.google.code.findbugs', name: 'jsr305', version: '3.0.1'
+    implementation project(":common")
+    // Runtime + compile. Loom puts this on the game classpath; the copy below
+    // also covers IntelliJ run configs that skip Loom's mod resolution.
+    modImplementation "dev.kosmx.player-anim:player-animation-lib-fabric:1.0.2-rc1+1.20"
+    include "dev.kosmx.player-anim:player-animation-lib-fabric:1.0.2-rc1+1.20"
+}
+
+def playerAnimatorFabric = file("libs/player-animation-lib-fabric.jar")
+
+tasks.matching { it.name in ["runClient", "runServer"] }.configureEach {
+    doFirst {
+        if (playerAnimatorFabric.exists()) {
+            def modsDir = file("run/mods")
+            modsDir.mkdirs()
+            copy {
+                from playerAnimatorFabric
+                into modsDir
+                rename { "player-animation-lib-fabric.jar" }
+            }
+        }
+    }
+}
+
+loom {
+    if (project(":common").file("src/main/resources/${mod_id}.accesswidener").exists()) {
+        accessWidenerPath.set(project(":common").file("src/main/resources/${mod_id}.accesswidener"))
+    }
+    mixin {
+        defaultRefmapName.set("${mod_id}.refmap.json")
+    }
+    runs {
+        client {
+            client()
+            setConfigName("Fabric Client")
+            ideConfigGenerated(true)
+            runDir("run")
+        }
+        server {
+            server()
+            setConfigName("Fabric Server")
+            ideConfigGenerated(true)
+            runDir("run")
+        }
+    }
+}

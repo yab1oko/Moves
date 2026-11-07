@@ -1,0 +1,10 @@
+{
+  "moves.stamina": "Выносливость",
+  "key.categories.moves": "Moves",
+  "key.moves.dodge": "Уворот (с WASD)",
+  "moves.config.title": "Конфиг Moves (config/moves.json)",
+  "item.moves.zipline_rope": "Верёвка зиплайна",
+  "item.moves.zipline_chain": "Цепь зиплайна",
+  "moves.zipline.first": "Первая точка. Ещё один клик — протянуть. С шифтом линия будет прямой.",
+  "moves.zipline.far": "Слишком далеко"
+}

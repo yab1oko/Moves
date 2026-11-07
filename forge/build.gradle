@@ -1,0 +1,84 @@
+plugins {
+    id 'multiloader-loader'
+    id 'net.neoforged.moddev.legacyforge'
+}
+
+repositories {
+    maven {
+        name = "KosmX"
+        url = "https://maven.kosmx.dev/"
+    }
+}
+
+mixin {
+    add(sourceSets.main, "${mod_id}.refmap.json")
+
+    config("${mod_id}.mixins.json")
+    config("${mod_id}.forge.mixins.json")
+}
+
+legacyForge {
+    version = "${minecraft_version}-${forge_version}"
+
+    validateAccessTransformers = true
+
+    def at = project(':common').file('src/main/resources/META-INF/accesstransformer.cfg')
+    if (at.exists()) {
+        accessTransformers = ["src/main/resources/META-INF/accesstransformer.cfg"]
+    }
+    parchment {
+        minecraftVersion = parchment_minecraft
+        mappingsVersion = parchment_version
+    }
+    runs {
+        client {
+            client()
+        }
+        data {
+            data()
+            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+        }
+        server {
+            server()
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+sourceSets.main.resources.srcDir 'src/generated/resources'
+
+def playerAnimatorNamed = file("libs/player-animation-lib-forge-named.jar")
+
+dependencies {
+    compileOnly project(":common")
+    // Compile against the Forge artifact. The dev game uses official names, so the
+    // SRG jar must not be on the runtime classpath. The named jar is copied into run/mods.
+    compileOnly "dev.kosmx.player-anim:player-animation-lib-forge:1.0.2-rc1+1.20"
+    annotationProcessor("org.spongepowered:mixin:0.8.5-SNAPSHOT:processor")
+}
+
+tasks.matching { it.name in ["runClient", "runServer", "runData"] }.configureEach {
+    doFirst {
+        if (!playerAnimatorNamed.exists()) {
+            throw new GradleException("Missing ${playerAnimatorNamed}. Player Animator cannot load in the Forge dev client.")
+        }
+        def modsDir = file("run/mods")
+        modsDir.mkdirs()
+        copy {
+            from playerAnimatorNamed
+            into modsDir
+        }
+    }
+}
+
+jar {
+    finalizedBy('reobfJar')
+    manifest.attributes([
+            "MixinConfigs": "${mod_id}.mixins.json,${mod_id}.forge.mixins.json"
+    ])
+}

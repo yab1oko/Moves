@@ -1,0 +1,22 @@
+﻿{
+  "version": 1,
+  "name": "roll",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 8,
+    "stopTick": 8,
+    "isLoop": false,
+    "returnTick": 0,
+    "nsfw": false,
+    "degrees": false,
+    "moves": [
+      {"tick": 0, "easing": "OUTCUBIC", "body": {"pitch": 0.8, "yaw": 0.0, "roll": 0.0}},
+      {"tick": 4, "easing": "LINEAR", "body": {"pitch": 1.2, "yaw": 0.0, "roll": 2.2}},
+      {"tick": 8, "easing": "OUTCUBIC", "body": {"pitch": 0.0, "yaw": 0.0, "roll": 0.0}},
+      {"tick": 0, "easing": "LINEAR", "rightArm": {"pitch": -1.0, "yaw": 0.2, "roll": 0.2}},
+      {"tick": 8, "easing": "LINEAR", "rightArm": {"pitch": 0.0, "yaw": 0.0, "roll": 0.0}},
+      {"tick": 0, "easing": "LINEAR", "leftArm": {"pitch": -1.0, "yaw": -0.2, "roll": -0.2}},
+      {"tick": 8, "easing": "LINEAR", "leftArm": {"pitch": 0.0, "yaw": 0.0, "roll": 0.0}}
+    ]
+  }
+}

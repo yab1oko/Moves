@@ -1,0 +1,31 @@
+# eclipse
+bin
+*.launch
+.settings
+.metadata
+.classpath
+.project
+
+# idea
+out
+*.ipr
+*.iws
+*.iml
+.idea/*
+!.idea/scopes
+
+# gradle
+build
+.gradle
+
+# other
+eclipse
+run
+**/run/
+_smref/
+*.log
+.DS_Store
+Thumbs.db
+*.bbmodel.bak
+forge/run/
+fabric/run/

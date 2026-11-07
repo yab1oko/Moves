@@ -1,0 +1,10 @@
+{
+  "moves.stamina": "Stamina",
+  "key.categories.moves": "Moves",
+  "key.moves.dodge": "Dodge (with WASD)",
+  "moves.config.title": "Moves config (config/moves.json)",
+  "item.moves.zipline_rope": "Zipline Rope",
+  "item.moves.zipline_chain": "Zipline Chain",
+  "moves.zipline.first": "First point. Click again to stretch the line. Sneak keeps it straight.",
+  "moves.zipline.far": "Too far"
+}

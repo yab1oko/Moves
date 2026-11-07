@@ -1,0 +1,31 @@
+{
+    "schemaVersion": 1,
+    "id": "moves",
+    "version": "${version}",
+    "name": "${mod_name}",
+    "description": "${description}",
+    "authors": [
+        "${mod_author}"
+    ],
+    "license": "${license}",
+    "environment": "*",
+    "entrypoints": {
+        "main": [
+            "yblk.moves.Moves"
+        ],
+        "client": [
+            "yblk.moves.MovesClientMod"
+        ]
+    },
+    "mixins": [
+        "${mod_id}.mixins.json",
+        "${mod_id}.fabric.mixins.json"
+    ],
+    "depends": {
+        "fabricloader": ">=0.14",
+        "fabric": "*",
+        "minecraft": "${minecraft_version}",
+        "java": ">=17",
+        "player-animator": "*"
+    }
+}

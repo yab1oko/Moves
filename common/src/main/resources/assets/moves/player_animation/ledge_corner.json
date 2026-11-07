@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "name": "ledge_corner",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 14,
+    "stopTick": 14,
+    "isLoop": false,
+    "returnTick": 0,
+    "nsfw": false,
+    "degrees": true,
+    "moves": [
+      {"tick": 0, "easing": "OUTSINE", "rightArm": {"pitch": -170, "yaw": -8, "roll": 12}},
+      {"tick": 5, "easing": "INOUTSINE", "rightArm": {"pitch": -95, "yaw": 55, "roll": 28}},
+      {"tick": 10, "easing": "INOUTSINE", "rightArm": {"pitch": -165, "yaw": 20, "roll": 10}},
+      {"tick": 14, "easing": "INSINE", "rightArm": {"pitch": -170, "yaw": -8, "roll": 12}},
+      {"tick": 0, "easing": "OUTSINE", "leftArm": {"pitch": -170, "yaw": 8, "roll": -12}},
+      {"tick": 5, "easing": "INOUTSINE", "leftArm": {"pitch": -155, "yaw": -35, "roll": -20}},
+      {"tick": 10, "easing": "INOUTSINE", "leftArm": {"pitch": -175, "yaw": 5, "roll": -8}},
+      {"tick": 14, "easing": "INSINE", "leftArm": {"pitch": -170, "yaw": 8, "roll": -12}},
+      {"tick": 0, "easing": "INOUTSINE", "torso": {"pitch": 16, "yaw": 0, "roll": 0}},
+      {"tick": 5, "easing": "INOUTSINE", "torso": {"pitch": 20, "yaw": 28, "roll": 8}},
+      {"tick": 14, "easing": "INOUTSINE", "torso": {"pitch": 16, "yaw": 0, "roll": 0}},
+      {"tick": 0, "easing": "LINEAR", "rightLeg": {"pitch": 16, "yaw": 4, "roll": 2}},
+      {"tick": 7, "easing": "LINEAR", "rightLeg": {"pitch": 30, "yaw": 8, "roll": 4}},
+      {"tick": 14, "easing": "LINEAR", "rightLeg": {"pitch": 16, "yaw": 4, "roll": 2}},
+      {"tick": 0, "easing": "LINEAR", "leftLeg": {"pitch": 28, "yaw": -4, "roll": -2}},
+      {"tick": 7, "easing": "LINEAR", "leftLeg": {"pitch": 12, "yaw": -8, "roll": -4}},
+      {"tick": 14, "easing": "LINEAR", "leftLeg": {"pitch": 28, "yaw": -4, "roll": -2}},
+      {"tick": 0, "easing": "LINEAR", "head": {"pitch": -24, "yaw": 0, "roll": 0}},
+      {"tick": 5, "easing": "LINEAR", "head": {"pitch": -18, "yaw": 22, "roll": 0}},
+      {"tick": 14, "easing": "LINEAR", "head": {"pitch": -24, "yaw": 0, "roll": 0}}
+    ]
+  }
+}

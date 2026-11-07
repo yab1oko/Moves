@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "name": "tool_hold",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 16,
+    "stopTick": 16,
+    "isLoop": true,
+    "returnTick": 0,
+    "nsfw": false,
+    "degrees": true,
+    "moves": [
+      {"tick": 0, "easing": "INOUTSINE", "head": {"pitch": 6, "yaw": 0, "roll": 0}},
+      {"tick": 8, "easing": "INOUTSINE", "head": {"pitch": 10, "yaw": 0, "roll": 0}},
+      {"tick": 16, "easing": "INOUTSINE", "head": {"pitch": 6, "yaw": 0, "roll": 0}},
+      {"tick": 0, "easing": "INOUTSINE", "torso": {"pitch": 16, "yaw": 0, "roll": 0}},
+      {"tick": 8, "easing": "INOUTSINE", "torso": {"pitch": 24, "yaw": 0, "roll": 0}},
+      {"tick": 16, "easing": "INOUTSINE", "torso": {"pitch": 16, "yaw": 0, "roll": 0}},
+      {"tick": 0, "easing": "INOUTSINE", "rightArm": {"pitch": -88, "yaw": -8, "roll": 10}},
+      {"tick": 8, "easing": "INOUTSINE", "rightArm": {"pitch": -104, "yaw": -6, "roll": 16}},
+      {"tick": 16, "easing": "INOUTSINE", "rightArm": {"pitch": -88, "yaw": -8, "roll": 10}},
+      {"tick": 0, "easing": "INOUTSINE", "leftArm": {"pitch": -88, "yaw": 8, "roll": -10}},
+      {"tick": 8, "easing": "INOUTSINE", "leftArm": {"pitch": -104, "yaw": 6, "roll": -16}},
+      {"tick": 16, "easing": "INOUTSINE", "leftArm": {"pitch": -88, "yaw": 8, "roll": -10}},
+      {"tick": 0, "easing": "LINEAR", "rightLeg": {"pitch": 12, "yaw": 4, "roll": 0}},
+      {"tick": 16, "easing": "LINEAR", "rightLeg": {"pitch": 12, "yaw": 4, "roll": 0}},
+      {"tick": 0, "easing": "LINEAR", "leftLeg": {"pitch": -6, "yaw": -4, "roll": 0}},
+      {"tick": 16, "easing": "LINEAR", "leftLeg": {"pitch": -6, "yaw": -4, "roll": 0}}
+    ]
+  }
+}

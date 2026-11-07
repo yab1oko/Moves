@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "name": "zipline_sword",
+  "emote": {
+    "beginTick": 0,
+    "endTick": 8,
+    "stopTick": 8,
+    "isLoop": true,
+    "returnTick": 0,
+    "nsfw": false,
+    "degrees": true,
+    "moves": [
+      {"tick": 0, "easing": "LINEAR", "head": {"pitch": 0, "yaw": 0, "roll": 0}},
+      {"tick": 8, "easing": "LINEAR", "head": {"pitch": 0, "yaw": 0, "roll": 0}},
+      {"tick": 0, "easing": "LINEAR", "rightArm": {"pitch": -175, "yaw": 0, "roll": 0}},
+      {"tick": 8, "easing": "LINEAR", "rightArm": {"pitch": -175, "yaw": 0, "roll": 0}},
+      {"tick": 0, "easing": "LINEAR", "leftArm": {"pitch": -175, "yaw": 0, "roll": 0}},
+      {"tick": 8, "easing": "LINEAR", "leftArm": {"pitch": -175, "yaw": 0, "roll": 0}},
+      {"tick": 0, "easing": "LINEAR", "rightLeg": {"pitch": 8, "yaw": 0, "roll": 0}},
+      {"tick": 8, "easing": "LINEAR", "rightLeg": {"pitch": 8, "yaw": 0, "roll": 0}},
+      {"tick": 0, "easing": "LINEAR", "leftLeg": {"pitch": 8, "yaw": 0, "roll": 0}},
+      {"tick": 8, "easing": "LINEAR", "leftLeg": {"pitch": 8, "yaw": 0, "roll": 0}}
+    ]
+  }
+}
