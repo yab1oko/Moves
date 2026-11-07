@@ -7,7 +7,6 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import yblk.moves.Constants;
-import yblk.moves.parkour.ParkourInput;
 
 public final class FabricMovesNet {
 
@@ -19,8 +18,8 @@ public final class FabricMovesNet {
 
     public static void registerServer() {
         ServerPlayNetworking.registerGlobalReceiver(INPUT, (server, player, handler, buf, response) -> {
-            ParkourInput input = ParkourInput.read(buf);
-            server.execute(() -> MovesNet.applyInput(player, input));
+            FriendlyByteBuf data = copy(buf);
+            server.execute(() -> MovesNet.handleServer(player, data));
         });
         MovesNet.IMPL = new MovesNet.Impl() {
             @Override
@@ -33,6 +32,11 @@ public final class FabricMovesNet {
                 for (ServerPlayer watcher : PlayerLookup.tracking(target)) {
                     ServerPlayNetworking.send(watcher, STATE, copy(buf));
                 }
+            }
+
+            @Override
+            public void sendToPlayer(ServerPlayer target, FriendlyByteBuf buf) {
+                ServerPlayNetworking.send(target, STATE, copy(buf));
             }
         };
     }
@@ -62,6 +66,13 @@ public final class FabricMovesNet {
             public void sendState(ServerPlayer target, FriendlyByteBuf buf) {
                 if (server != null) {
                     server.sendState(target, buf);
+                }
+            }
+
+            @Override
+            public void sendToPlayer(ServerPlayer target, FriendlyByteBuf buf) {
+                if (server != null) {
+                    server.sendToPlayer(target, buf);
                 }
             }
         };

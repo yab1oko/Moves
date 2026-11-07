@@ -65,8 +65,10 @@ public final class ParkourPlayer {
     public float prevForward;
     public boolean proneLatch;
     public boolean prevProneCombo;
+    public boolean prevProneKey;
     public boolean prevJump;
     public boolean prevDodgeKey;
+    public boolean prevSlideKey;
     public boolean prevSneak;
     public int jumpCharge;
     /** Cooldown after a slide before another can start. */
@@ -103,6 +105,8 @@ public final class ParkourPlayer {
     public int grabIgnoreTicks;
     /** How long the current pull-up should take. Set from look pitch when it starts. */
     public int pullDuration = 20;
+    /** Blocks of rise when the ledge was grabbed — scales pull-up length. */
+    public double grabRise;
     /** Space must be released before another pull-up can spend stamina. */
     public boolean pullLocked;
     /** How many ticks space has been up during a pull-up. A one-tick gap must not restart the clip. */

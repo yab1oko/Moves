@@ -10,7 +10,6 @@ import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 import yblk.moves.Constants;
-import yblk.moves.parkour.ParkourInput;
 
 import java.util.function.Supplier;
 
@@ -38,6 +37,11 @@ public final class ForgeMovesNet {
             @Override
             public void sendState(ServerPlayer target, FriendlyByteBuf buf) {
                 CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> target), new Payload(true, toBytes(buf)));
+            }
+
+            @Override
+            public void sendToPlayer(ServerPlayer target, FriendlyByteBuf buf) {
+                CHANNEL.send(PacketDistributor.PLAYER.with(() -> target), new Payload(true, toBytes(buf)));
             }
         };
     }
@@ -72,7 +76,7 @@ public final class ForgeMovesNet {
                 if (context.getDirection() == NetworkDirection.PLAY_TO_SERVER) {
                     ServerPlayer sender = context.getSender();
                     if (sender != null) {
-                        MovesNet.applyInput(sender, ParkourInput.read(new FriendlyByteBuf(Unpooled.wrappedBuffer(msg.data))));
+                        MovesNet.handleServer(sender, new FriendlyByteBuf(Unpooled.wrappedBuffer(msg.data)));
                     }
                     return;
                 }

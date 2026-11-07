@@ -35,6 +35,9 @@ public final class MovesForgeClient {
     @SubscribeEvent
     public static void keys(RegisterKeyMappingsEvent event) {
         event.register(MovesKeybinds.DODGE);
+        event.register(MovesKeybinds.GRAB);
+        event.register(MovesKeybinds.PRONE);
+        event.register(MovesKeybinds.SLIDE);
     }
 
     @Mod.EventBusSubscriber(modid = Constants.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)

@@ -14,10 +14,12 @@ public final class ParkourInput {
     public boolean sneak;
     public boolean sprint;
     public boolean prone;
-    /** Right mouse button. Held to grab a ledge, chain or bars. */
+    /** Grab key (default RMB). Held to grab a ledge, chain or bars. */
     public boolean grab;
     /** True on the tick an enhanced jump should fire (after charge release). */
     public boolean enhanced;
+    /** Rising-edge pulse: start a ground slide this tick. */
+    public boolean slide;
     /** -1 left, 1 right, 2 back, 3 forward, 0 none. */
     public int dodge;
     /** 0..JUMP_CHARGE_TICKS while charging an enhanced jump. */
@@ -45,6 +47,9 @@ public final class ParkourInput {
         if (this.grab) {
             flags |= 32;
         }
+        if (this.slide) {
+            flags |= 64;
+        }
         buf.writeByte(flags);
         buf.writeByte(this.dodge);
         buf.writeByte(this.jumpCharge);
@@ -61,6 +66,7 @@ public final class ParkourInput {
         input.prone = (flags & 8) != 0;
         input.enhanced = (flags & 16) != 0;
         input.grab = (flags & 32) != 0;
+        input.slide = (flags & 64) != 0;
         input.dodge = buf.readByte();
         input.jumpCharge = buf.readUnsignedByte();
         return input;

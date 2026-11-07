@@ -12,6 +12,9 @@ public class MovesClientMod implements ClientModInitializer {
     public void onInitializeClient() {
         FabricMovesNet.registerClient();
         KeyBindingHelper.registerKeyBinding(MovesKeybinds.DODGE);
+        KeyBindingHelper.registerKeyBinding(MovesKeybinds.GRAB);
+        KeyBindingHelper.registerKeyBinding(MovesKeybinds.PRONE);
+        KeyBindingHelper.registerKeyBinding(MovesKeybinds.SLIDE);
         MovesClient.start();
         net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(
                 yblk.moves.MovesContent.ZIPLINE, yblk.moves.client.ZiplineRenderer::new);

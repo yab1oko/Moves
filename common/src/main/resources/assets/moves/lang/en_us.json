@@ -2,9 +2,17 @@
   "moves.stamina": "Stamina",
   "key.categories.moves": "Moves",
   "key.moves.dodge": "Dodge (with WASD)",
+  "key.moves.grab": "Grab / Cling",
+  "key.moves.prone": "Prone / Crawl",
+  "key.moves.slide": "Slide",
+  "moves.zipline.low": "Too close to the ground",
+  "moves.zipline.busy": "A line is already attached here",
+  "moves.zipline.sign_edit": "Hanging sign",
   "moves.config.title": "Moves config (config/moves.json)",
   "item.moves.zipline_rope": "Zipline Rope",
+  "item.moves.zipline_rope_dark": "Dark Zipline Rope",
   "item.moves.zipline_chain": "Zipline Chain",
   "moves.zipline.first": "First point. Click again to stretch the line. Sneak keeps it straight.",
-  "moves.zipline.far": "Too far"
+  "moves.zipline.far": "Too far",
+  "moves.zipline.need_other": "Click a different block or fence for the second point"
 }

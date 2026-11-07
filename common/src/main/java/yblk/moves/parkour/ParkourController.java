@@ -641,15 +641,12 @@ public final class ParkourController {
     }
 
     /**
-     * Sprint + Shift (rising edge) → ground slide keeping run momentum.
-     * Does not fire while charging a jump (Shift+Space) or crawl-toggling (Ctrl+Shift).
+     * Slide key (or Sprint+Shift pulse from the client) → ground slide keeping run momentum.
      */
     private static void trySlide(Player player, ParkourPlayer data) {
         MovesConfig cfg = MovesConfig.get();
-        boolean sneak = data.input.sneak;
-        boolean rising = sneak && !data.prevSneak;
-        data.prevSneak = sneak;
-        if (!cfg.slide || !rising) {
+        data.prevSneak = data.input.sneak;
+        if (!cfg.slide || !data.input.slide) {
             return;
         }
         if (data.mode != ParkourMode.NONE || data.prone || data.slideCooldown > 0 || data.settleTicks > 0) {
@@ -870,18 +867,30 @@ public final class ParkourController {
         if (ledge == null || standingOnLip(player, ledge)) {
             return;
         }
-        if (!spend(player, data, MovesConfig.get().grabCost)) {
-            return;
-        }
-        data.mode = ParkourMode.LEDGE;
         data.facing = ledge.facing;
         data.anchor = ledge.pos.immutable();
         data.along = 0.0;
         data.anchorTop = lip(player.level(), ledge.pos(), ledge.facing(), 0.0);
-        data.actionTicks = 0;
         Vec3 rawLedge = seatOnLip(player.level(), ledge.pos(), ledge.facing(), ledgePoint(data));
         Vec3 fittedLedge = fitCling(player, rawLedge, ledge.facing.getOpposite(), ledge.pos);
-        data.goalPos = fittedLedge != null ? fittedLedge : rawLedge;
+        // No free spot = do not start a grab that freezes the body in the stair/wall.
+        if (fittedLedge == null) {
+            data.anchor = null;
+            data.facing = null;
+            data.anchorTop = 0.0;
+            return;
+        }
+        if (!spend(player, data, MovesConfig.get().grabCost)) {
+            data.anchor = null;
+            data.facing = null;
+            data.anchorTop = 0.0;
+            return;
+        }
+        double baseY = player.onGround() ? player.getY() : data.jumpStartY;
+        data.grabRise = Math.max(0.5, data.anchorTop - baseY);
+        data.mode = ParkourMode.LEDGE;
+        data.actionTicks = 0;
+        data.goalPos = fittedLedge;
         data.motion = Vec3.ZERO;
         data.cornerTicks = 0;
         data.cornerLock = 0;
@@ -1044,9 +1053,14 @@ public final class ParkourController {
         if (!data.input.jump) {
             data.pullLocked = false;
         }
-        if (pressed && !data.pullLocked && data.cornerTicks <= 0 && canPullUp(level, data.anchor)
+        boolean onStair = level.getBlockState(data.anchor).getBlock() instanceof net.minecraft.world.level.block.StairBlock;
+        // Full ledges: Space pull-up. Stair walls: only at the top (no higher stair).
+        boolean stairTopMount = onStair && canPullUp(level, data.anchor)
+                && !(level.getBlockState(data.anchor.above()).getBlock() instanceof net.minecraft.world.level.block.StairBlock);
+        if (pressed && !data.pullLocked && data.cornerTicks <= 0
+                && ((!onStair && canPullUp(level, data.anchor)) || stairTopMount)
                 && spend(player, data, MovesConfig.get().pullUpCost)) {
-            data.pullDuration = pullTicksForLook(player);
+            data.pullDuration = pullTicksForRise(data.grabRise);
             data.pullLocked = true;
             data.mode = ParkourMode.PULLUP;
             data.actionTicks = 0;
@@ -1054,7 +1068,7 @@ public final class ParkourController {
             markDirty(data);
             return;
         }
-        // Hold + A/D only. Sneak, look, and W never change height.
+        // Hold + A/D only. Sneak, look, and W never change height on full ledges.
         Direction alongAxis = data.facing.getCounterClockWise();
         Vec3 alongVec = new Vec3(alongAxis.getStepX(), 0.0, alongAxis.getStepZ());
         Vec3 camLeft = leftOf(horizontalLook(player));
@@ -1099,20 +1113,18 @@ public final class ParkourController {
                 return;
             }
         }
-        boolean onStair = level.getBlockState(data.anchor).getBlock() instanceof net.minecraft.world.level.block.StairBlock;
         if (shimmy != 0) {
             drain(player, data, MovesConfig.get().shimmyDrain);
-            // Stairs need a firm step, not a skate along the lip.
-            data.along += shimmy * (onStair ? ParkourTuning.SHIMMY_SPEED * 0.32 : ParkourTuning.SHIMMY_SPEED);
+            // Same sideways speed on stairs as on a full ledge.
+            data.along += shimmy * ParkourTuning.SHIMMY_SPEED;
             Direction travel = shimmy > 0 ? alongAxis : alongAxis.getOpposite();
             boolean past = shimmy > 0 ? data.along > 0.5 : data.along < -0.5;
-            if (past && onStair) {
-                data.along = shimmy > 0 ? 0.38 : -0.38;
-            } else if (past) {
+            if (past) {
                 double over = shimmy > 0 ? data.along - 0.5 : data.along + 0.5;
                 if (advanceStraight(level, data, travel)) {
                     data.along = shimmy > 0 ? -0.5 + over : 0.5 + over;
                 } else if (!onStair && queueCorner(level, player, data, travel)) {
+                    // Stairs keep facing; only full ledges wrap around a corner.
                     data.along = shimmy > 0 ? 0.48 : -0.48;
                     data.goalPos = player.position();
                     data.motion = Vec3.ZERO;
@@ -1126,9 +1138,6 @@ public final class ParkourController {
                 && level.getBlockState(data.anchor).getBlock() instanceof net.minecraft.world.level.block.StairBlock;
         if (stair) {
             data.anchorTop = lip(level, data.anchor, data.facing, data.along);
-            data.cornerVia = null;
-            data.cornerAnchor = null;
-            data.cornerFacing = null;
         }
         if (stair && data.moveLock <= 0) {
             boolean settled = player.position().distanceTo(data.goalPos == null ? player.position() : data.goalPos) < 0.18;
@@ -1138,7 +1147,27 @@ public final class ParkourController {
             } else if (data.input.forward < -0.55F || data.input.sneak) {
                 vertical = -1;
             }
-            if (vertical != 0 && settled && stepStair(level, player, data, vertical)) {
+            if (vertical > 0 && settled) {
+                if (stepStair(level, player, data, 1)) {
+                    data.moveLock = 10;
+                    Vec3 stepped = seatOnLip(level, data.anchor, data.facing, ledgePoint(data));
+                    Vec3 fittedStep = fitCling(player, stepped, data.facing.getOpposite(), data.anchor);
+                    data.goalPos = fittedStep != null ? fittedStep : stepped;
+                    data.motion = Vec3.ZERO;
+                    return;
+                }
+                // Top of the stair wall — W mounts onto the lip like a pull-up.
+                if (canPullUp(level, data.anchor) && !data.pullLocked
+                        && spend(player, data, MovesConfig.get().pullUpCost)) {
+                    data.pullDuration = pullTicksForRise(data.grabRise);
+                    data.pullLocked = true;
+                    data.mode = ParkourMode.PULLUP;
+                    data.actionTicks = 0;
+                    data.pullStart = player.position();
+                    markDirty(data);
+                    return;
+                }
+            } else if (vertical < 0 && settled && stepStair(level, player, data, -1)) {
                 data.moveLock = 10;
                 Vec3 stepped = seatOnLip(level, data.anchor, data.facing, ledgePoint(data));
                 Vec3 fittedStep = fitCling(player, stepped, data.facing.getOpposite(), data.anchor);
@@ -1149,7 +1178,11 @@ public final class ParkourController {
         }
         Vec3 raw = seatOnLip(level, data.anchor, data.facing, ledgePoint(data));
         Vec3 fitted = fitCling(player, raw, data.facing.getOpposite(), data.anchor);
-        data.goalPos = fitted != null ? fitted : player.position();
+        if (fitted == null) {
+            release(player, data);
+            return;
+        }
+        data.goalPos = fitted;
         data.motion = Vec3.ZERO;
     }
 
@@ -1157,12 +1190,12 @@ public final class ParkourController {
     private static boolean stepStair(Level level, Player player, ParkourPlayer data, int vertical) {
         BlockPos anchor = data.anchor;
         Direction face = data.facing;
+        // Only the stair column. relative(face).above() was a full block one step too high.
         BlockPos[] tries = vertical > 0
-                ? new BlockPos[]{anchor.above(), anchor.relative(face).above()}
-                : new BlockPos[]{anchor.below(), anchor.relative(face.getOpposite()).below()};
+                ? new BlockPos[]{anchor.above()}
+                : new BlockPos[]{anchor.below()};
         for (BlockPos pos : tries) {
-            if (!(level.getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.StairBlock)
-                    && !HangBlocks.sturdyLedge(level, pos)) {
+            if (!(level.getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.StairBlock)) {
                 continue;
             }
             if (!HangBlocks.sturdyLedge(level, pos) || !lipApproach(level, pos, face)) {
@@ -1378,7 +1411,7 @@ public final class ParkourController {
                 top,
                 data.anchor.getZ() + 0.5 - into.getStepZ() * (0.5 + ParkourTuning.LEDGE_STAND_OFF)
         );
-        int span = data.pullDuration > 0 ? data.pullDuration : pullTicksForLook(player);
+        int span = data.pullDuration > 0 ? data.pullDuration : pullTicksForRise(data.grabRise);
         double t = Mth.clamp(data.actionTicks / (float) span, 0.0F, 1.0F);
         double ease = t * t * (3.0 - 2.0 * t);
         Vec3 goal = ease < 0.55
@@ -1852,7 +1885,14 @@ public final class ParkourController {
     private static boolean advanceStraight(Level level, ParkourPlayer data, Direction travel) {
         BlockPos next = data.anchor.relative(travel);
         double lipY = data.anchorTop > 0.0 ? data.anchorTop : data.anchor.getY() + 1.0;
-        if (!HangBlocks.sturdyLedge(level, next) || !sameLip(level, next, lipY) || !faceOpen(level, next, data.facing)) {
+        if (!HangBlocks.sturdyLedge(level, next) || !faceOpen(level, next, data.facing)) {
+            return false;
+        }
+        // Enter from the near edge so a stair's low/high half lines up with this lip.
+        Direction alongAxis = data.facing.getCounterClockWise();
+        double entryAlong = travel == alongAxis ? -0.42 : 0.42;
+        double nextLip = lip(level, next, data.facing, entryAlong);
+        if (Math.abs(nextLip - lipY) > 0.55 && !sameLip(level, next, lipY)) {
             return false;
         }
         takeLedge(level, data, next, data.facing);
@@ -1919,14 +1959,19 @@ public final class ParkourController {
         return current + delta;
     }
 
-    /** A slab or stair is only the lip. The hands go on the solid block under it. */
+    /**
+     * A slab / trapdoor is only a thin shelf — hang on the solid under it.
+     * Stairs are the wall itself; redirecting under them grabs the lower block and traps you.
+     */
     private static Ledge supportUnderLip(Level level, Player player, Ledge ledge) {
         if (ledge == null || !HangBlocks.isPartialLip(level.getBlockState(ledge.pos()))) {
             return ledge;
         }
+        if (level.getBlockState(ledge.pos()).getBlock() instanceof net.minecraft.world.level.block.StairBlock) {
+            return ledge;
+        }
         BlockPos support = ledge.pos().below();
         var under = level.getBlockState(support);
-        // A stair on another stair is the step itself. Only a full block below steals the hands.
         if (under.isAir() || HangBlocks.isPartialLip(under) || HangBlocks.canHold(level, support)
                 || under.getCollisionShape(level, support).isEmpty()) {
             return ledge;
@@ -2389,6 +2434,12 @@ public final class ParkourController {
         return Math.round(Mth.lerp(down, 20.0F, 40.0F));
     }
 
+    /** A 2-block grab mounts faster than a 3–4 block grab. */
+    private static int pullTicksForRise(double rise) {
+        float t = (float) Mth.clamp((rise - 1.6) / 2.0, 0.0, 1.0);
+        return Math.round(Mth.lerp(t, 24.0F, 44.0F));
+    }
+
     private static boolean canPullUp(Level level, BlockPos solid) {
         return HangBlocks.open(level, solid.above()) && HangBlocks.open(level, solid.above(2));
     }
@@ -2527,7 +2578,8 @@ public final class ParkourController {
         Level level = player.level();
         Vec3 eye = player.getEyePosition();
         Vec3 look = player.getLookAngle();
-        double reach = Math.min(ParkourTuning.GRAB_ARM_REACH + 0.45, maxBlocks + 0.75);
+        // Horizontal arm reach only — maxBlocks is vertical rise, not distance from the wall.
+        double reach = ParkourTuning.GRAB_ARM_REACH + 0.25;
         double base = player.onGround() ? player.getY() : data.jumpStartY;
         Ledge partial = findPartialLedge(level, player, eye, look, base, maxBlocks);
         if (partial != null) {
@@ -2596,42 +2648,55 @@ public final class ParkourController {
 
     /** Slab, stair or trapdoor the crosshair passes through. Does not require a solid hit. */
     private static Ledge findPartialLedge(Level level, Player player, Vec3 eye, Vec3 look, double base, int maxBlocks) {
-        double reach = Math.min(2.6, maxBlocks + 1.1);
+        double reach = ParkourTuning.GRAB_ARM_REACH + 0.25;
         HitResult outline = level.clip(new ClipContext(
                 eye, eye.add(look.scale(reach)), ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
         if (outline instanceof BlockHitResult outlineHit && outlineHit.getType() == HitResult.Type.BLOCK) {
-            Ledge aimed = partialFromPos(level, outlineHit.getBlockPos(), player, eye, look, base, maxBlocks, reach);
+            BlockPos hitPos = outlineHit.getBlockPos();
+            Ledge aimed = partialFromPos(level, hitPos, player, eye, look, base, maxBlocks, reach);
             if (aimed != null) {
                 return aimed;
             }
-            BlockPos ahead = outlineHit.getBlockPos().relative(outlineHit.getDirection());
+            BlockPos ahead = hitPos.relative(outlineHit.getDirection());
             Ledge inFront = partialFromPos(level, ahead, player, eye, look, base, maxBlocks, reach);
             if (inFront != null) {
                 return inFront;
             }
-            Ledge lipBelow = partialFromPos(level, ahead.below(), player, eye, look, base, maxBlocks, reach);
-            if (lipBelow != null) {
-                return lipBelow;
-            }
-            Ledge underHit = partialFromPos(level, outlineHit.getBlockPos().below(), player, eye, look, base, maxBlocks, reach);
-            if (underHit != null) {
-                return underHit;
+            // Only drop to the block under for slabs/trapdoors — never for stair walls.
+            boolean stairAim = level.getBlockState(hitPos).getBlock() instanceof net.minecraft.world.level.block.StairBlock
+                    || level.getBlockState(ahead).getBlock() instanceof net.minecraft.world.level.block.StairBlock;
+            if (!stairAim) {
+                Ledge lipBelow = partialFromPos(level, ahead.below(), player, eye, look, base, maxBlocks, reach);
+                if (lipBelow != null) {
+                    return lipBelow;
+                }
+                Ledge underHit = partialFromPos(level, hitPos.below(), player, eye, look, base, maxBlocks, reach);
+                if (underHit != null) {
+                    return underHit;
+                }
             }
         }
         Ledge found = null;
-        double bestDot = 0.45;
-        reach = Math.min(2.6, maxBlocks + 1.1);
+        double bestScore = 0.45;
         for (double t = 0.25; t <= reach; t += 0.15) {
             Vec3 sample = eye.add(look.scale(t));
             BlockPos cell = BlockPos.containing(sample);
-            for (BlockPos pos : new BlockPos[]{cell, cell.below(), cell.below(2)}) {
+            // Prefer the cell on the ray. Checking below(2) grabbed the lower stair and stuck you.
+            for (BlockPos pos : new BlockPos[]{cell, cell.below()}) {
                 Ledge partial = partialFromPos(level, pos, player, eye, look, base, maxBlocks, reach);
                 if (partial == null) {
                     continue;
                 }
-                double dot = Vec3.atCenterOf(partial.pos()).subtract(eye).normalize().dot(look);
-                if (dot > bestDot) {
-                    bestDot = dot;
+                Vec3 lipAt = new Vec3(partial.pos().getX() + 0.5, partial.top(), partial.pos().getZ() + 0.5);
+                Vec3 rel = lipAt.subtract(eye);
+                double along = rel.dot(look);
+                if (along < 0.1) {
+                    continue;
+                }
+                double side = rel.subtract(look.scale(along)).lengthSqr();
+                double score = look.dot(rel.normalize()) - side * 0.35;
+                if (score > bestScore) {
+                    bestScore = score;
                     found = partial;
                 }
             }
@@ -2641,13 +2706,22 @@ public final class ParkourController {
 
     private static Ledge partialFromPos(Level level, BlockPos pos, Player player, Vec3 eye, Vec3 look,
                                         double base, int maxBlocks, double reach) {
-        if (!HangBlocks.isPartialLip(level.getBlockState(pos)) || !HangBlocks.sturdyLedge(level, pos)) {
+        var state = level.getBlockState(pos);
+        if (!HangBlocks.isPartialLip(state) || !HangBlocks.sturdyLedge(level, pos)) {
             return null;
         }
         double top = lip(level, pos);
         double rise = top - base;
         if (rise < 0.2 || rise > maxBlocks + 1.25) {
             return null;
+        }
+        // Stair walls hang on the stair. Only slabs/trapdoors redirect to the block under.
+        if (state.getBlock() instanceof net.minecraft.world.level.block.StairBlock) {
+            Direction face = lipFace(level, pos, player, look);
+            if (face == null || eye.distanceTo(Vec3.atCenterOf(pos)) > reach + 0.15) {
+                return null;
+            }
+            return new Ledge(pos.immutable(), face, top);
         }
         BlockPos support = pos.below();
         var under = level.getBlockState(support);
@@ -2659,7 +2733,7 @@ public final class ParkourController {
         if (face == null) {
             return null;
         }
-        if (eye.distanceTo(Vec3.atCenterOf(support)) > reach + 0.8) {
+        if (eye.distanceTo(Vec3.atCenterOf(support)) > reach + 0.15) {
             return null;
         }
         return new Ledge(support.immutable(), face, lip(level, support));
@@ -2709,6 +2783,9 @@ public final class ParkourController {
         if (!HangBlocks.sturdyLedge(level, solid)) {
             return null;
         }
+        if (player.getEyePosition().distanceTo(Vec3.atCenterOf(solid)) > ParkourTuning.GRAB_ARM_REACH + 0.35) {
+            return null;
+        }
         double top = lip(level, solid);
         double rise = top - base;
         boolean shortLip = HangBlocks.isPartialLip(level.getBlockState(solid))
@@ -2753,6 +2830,9 @@ public final class ParkourController {
     private static Ledge tryMakeLedge(Level level, BlockHitResult hit, Player player, double base, int maxBlocks) {
         BlockPos solid = hit.getBlockPos();
         if (!HangBlocks.sturdyLedge(level, solid)) {
+            return null;
+        }
+        if (player.getEyePosition().distanceTo(Vec3.atCenterOf(solid)) > ParkourTuning.GRAB_ARM_REACH + 0.35) {
             return null;
         }
         double top = lip(level, solid);

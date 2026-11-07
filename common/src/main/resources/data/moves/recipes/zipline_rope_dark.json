@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "moves:zipline_rope" },
+    { "item": "minecraft:black_dye" }
+  ],
+  "result": {
+    "item": "moves:zipline_rope_dark",
+    "count": 1
+  }
+}

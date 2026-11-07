@@ -2,9 +2,17 @@
   "moves.stamina": "Выносливость",
   "key.categories.moves": "Moves",
   "key.moves.dodge": "Уворот (с WASD)",
+  "key.moves.grab": "Зацеп",
+  "key.moves.prone": "Прилечь / Ползти",
+  "key.moves.slide": "Подкат",
+  "moves.zipline.low": "Слишком близко к полу",
+  "moves.zipline.busy": "Здесь уже есть верёвка или цепь",
+  "moves.zipline.sign_edit": "Подвесная табличка",
   "moves.config.title": "Конфиг Moves (config/moves.json)",
   "item.moves.zipline_rope": "Верёвка зиплайна",
+  "item.moves.zipline_rope_dark": "Тёмная верёвка зиплайна",
   "item.moves.zipline_chain": "Цепь зиплайна",
   "moves.zipline.first": "Первая точка. Ещё один клик — протянуть. С шифтом линия будет прямой.",
-  "moves.zipline.far": "Слишком далеко"
+  "moves.zipline.far": "Слишком далеко",
+  "moves.zipline.need_other": "Кликни другой блок или забор для второй точки"
 }

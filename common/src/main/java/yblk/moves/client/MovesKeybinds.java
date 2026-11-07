@@ -16,6 +16,28 @@ public final class MovesKeybinds {
             "key.categories.moves"
     );
 
+    /** Default RMB — same as vanilla Use. Rebindable in Controls. */
+    public static final KeyMapping GRAB = new KeyMapping(
+            "key.moves.grab",
+            InputConstants.Type.MOUSE,
+            GLFW.GLFW_MOUSE_BUTTON_RIGHT,
+            "key.categories.moves"
+    );
+
+    public static final KeyMapping PRONE = new KeyMapping(
+            "key.moves.prone",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_C,
+            "key.categories.moves"
+    );
+
+    public static final KeyMapping SLIDE = new KeyMapping(
+            "key.moves.slide",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_X,
+            "key.categories.moves"
+    );
+
     private MovesKeybinds() {
     }
 }

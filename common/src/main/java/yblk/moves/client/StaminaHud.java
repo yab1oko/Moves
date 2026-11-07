@@ -72,6 +72,7 @@ public final class StaminaHud {
             float iconHi = iconLo + 10.0F;
             float filled = stamina - iconLo;
 
+            // Icons that would be spent by the charged jump shake + flash.
             boolean committed = charging && previewCost > 0.0F
                     && iconHi > afterJump + 0.01F
                     && iconLo < stamina - 0.01F;
@@ -79,13 +80,18 @@ public final class StaminaHud {
             int drawX = baseX;
             int drawY = y;
             if (committed) {
-                float amp = 0.25F + chargeT * 0.55F;
-                drawX += Math.round(Mth.sin((time + icon * 3) * 0.55F) * amp);
-                drawY += Math.round(Mth.cos((time + icon * 5) * 0.65F) * amp * 0.45F);
+                float amp = 1.6F + chargeT * 2.4F;
+                drawX += Math.round(Mth.sin((time + icon * 3) * 1.15F) * amp);
+                drawY += Math.round(Mth.cos((time + icon * 5) * 1.35F) * amp * 0.7F);
+                float pulse = 0.55F + 0.45F * Mth.sin((time + icon) * 0.9F);
+                graphics.setColor(1.0F, 0.85F + 0.15F * pulse, 0.35F + 0.45F * pulse, 1.0F);
             }
 
             int style = filled >= 10.0F ? 2 : filled >= 5.0F ? 1 : 0;
             graphics.blit(TEXTURE, drawX, drawY, style * ICON, 0, ICON, ICON, SHEET_W, SHEET_H);
+            if (committed) {
+                graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
+            }
         }
     }
 }

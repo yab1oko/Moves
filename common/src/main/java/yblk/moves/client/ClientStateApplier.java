@@ -3,6 +3,7 @@ package yblk.moves.client;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.player.Player;
+import yblk.moves.network.MovesNet;
 import yblk.moves.parkour.ParkourController;
 import yblk.moves.parkour.ParkourMode;
 import yblk.moves.parkour.ParkourPlayer;
@@ -16,6 +17,18 @@ public final class ClientStateApplier {
         FriendlyByteBuf buf = new FriendlyByteBuf(io.netty.buffer.Unpooled.wrappedBuffer(payload));
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null) {
+            return;
+        }
+        int type = buf.readUnsignedByte();
+        if (type == MovesNet.MSG_SIGN_OPEN) {
+            int entityId = buf.readVarInt();
+            int index = buf.readVarInt();
+            boolean front = buf.readBoolean();
+            String[] lines = new String[4];
+            for (int i = 0; i < 4; i++) {
+                lines[i] = buf.readUtf(50);
+            }
+            ZiplineSignScreen.open(entityId, index, lines, front);
             return;
         }
         int id = buf.readVarInt();

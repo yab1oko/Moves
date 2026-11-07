@@ -13,9 +13,10 @@ import yblk.moves.parkour.ParkourTuning;
 /**
  * Smart Moving–style input:
  * - Charged jump: hold Shift + Space to charge, release Space to jump
- * - Grab: hold RMB
+ * - Grab: hold Grab key (default RMB)
  * - Dodge: WASD + Alt
- * - Crawl: Ctrl+Shift toggle → swimming pose on ground
+ * - Prone: Prone key toggle (default C), or Ctrl+Shift
+ * - Slide: Slide key (default X), or Sprint+Shift rising edge
  */
 public final class ClientParkourInput {
 
@@ -26,10 +27,18 @@ public final class ClientParkourInput {
         ParkourPlayer data = ParkourPlayer.get(player);
         data.local = true;
         Minecraft minecraft = Minecraft.getInstance();
+        ItemStack heldMain = player.getMainHandItem();
+        ItemStack heldOff = player.getOffhandItem();
+        yblk.moves.entity.ZiplineEntity.SUPPRESS_PICK.set(
+                heldMain.getItem() instanceof yblk.moves.item.ZiplineItem
+                        || heldOff.getItem() instanceof yblk.moves.item.ZiplineItem);
         boolean shift = minecraft.options.keyShift.isDown();
         boolean ctrl = minecraft.options.keySprint.isDown();
         boolean jump = minecraft.options.keyJump.isDown();
         boolean dodgeKey = MovesKeybinds.DODGE.isDown();
+        boolean grabKey = MovesKeybinds.GRAB.isDown();
+        boolean proneKey = MovesKeybinds.PRONE.isDown();
+        boolean slideKey = MovesKeybinds.SLIDE.isDown();
         boolean sprinting = player.isSprinting();
         // Ctrl+Shift toggles crawl only when standing. During a sprint or a slide it is the slide key.
         boolean combo = shift && ctrl && !sprinting
@@ -46,10 +55,11 @@ public final class ClientParkourInput {
         boolean holding = !main.isEmpty()
                 && !yblk.moves.item.ClimbGear.equipped(player)
                 && !lineHands;
-        if (cfg.crawl && combo && !data.prevProneCombo) {
+        if (cfg.crawl && ((combo && !data.prevProneCombo) || (proneKey && !data.prevProneKey))) {
             data.proneLatch = !data.proneLatch;
         }
         data.prevProneCombo = combo;
+        data.prevProneKey = proneKey;
         if (!cfg.crawl) {
             data.proneLatch = false;
         }
@@ -103,6 +113,13 @@ public final class ClientParkourInput {
             player.setJumping(false);
         }
 
+        boolean slidePulse = cfg.slide && !data.proneLatch && data.mode == ParkourMode.NONE
+                && ((slideKey && !data.prevSlideKey)
+                || (shift && !data.prevSneak && (sprinting || data.recentSprintTicks > 0) && !combo && !jump
+                && data.jumpCharge <= 0));
+        data.prevSlideKey = slideKey;
+        data.prevSneak = shift;
+
         ParkourInput input = data.input;
         input.forward = forward;
         input.strafe = strafe;
@@ -111,7 +128,8 @@ public final class ClientParkourInput {
         input.sprint = sprinting && !data.proneLatch;
         input.prone = data.proneLatch;
         input.enhanced = enhanced;
-        input.grab = minecraft.options.keyUse.isDown() && !data.proneLatch && !holding;
+        input.grab = grabKey && !data.proneLatch && !holding;
+        input.slide = slidePulse;
         input.dodge = dodge;
         input.jumpCharge = charging ? data.jumpCharge : 0;
         MovesNet.sendInput(input);

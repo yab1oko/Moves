@@ -8,6 +8,7 @@ import yblk.moves.entity.ZiplineEntity;
 public final class MovesContent {
 
     public static Item ZIPLINE_ROPE;
+    public static Item ZIPLINE_ROPE_DARK;
     public static Item ZIPLINE_CHAIN;
     public static EntityType<ZiplineEntity> ZIPLINE;
 
