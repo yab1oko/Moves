@@ -139,7 +139,7 @@ public final class HangBlocks {
 
     /**
      * Full orbit: freestanding pole/chain, or a lone fence/bar post.
-     * End of a fence/bar run: only orbit toward the open side (handled by caller via {@link #orbitSignAllowed}).
+     * End of a fence/bar run: only orbit toward the open side (handled by caller via {@link #orbitOpenSign}).
      */
     public static boolean allowsOrbit(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
