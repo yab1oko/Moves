@@ -23,32 +23,11 @@ dependencies {
     modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
     implementation group: 'com.google.code.findbugs', name: 'jsr305', version: '3.0.1'
     implementation project(":common")
-    // Compile + nest Player Animator inside the Fabric jar (jar-in-jar).
-    modImplementation include("dev.kosmx.player-anim:player-animation-lib-fabric:1.0.2-rc1+1.20")
+    // Required dependency — players install Player Animator separately (not jar-in-jar).
+    modImplementation "dev.kosmx.player-anim:player-animation-lib-fabric:1.0.2-rc1+1.20"
     // Mods list + Config button (compile for ModMenuApi; runtime only in dev — not nested in jar).
     modCompileOnly "com.terraformersmc:modmenu:${modmenu_version}"
     modLocalRuntime "com.terraformersmc:modmenu:${modmenu_version}"
-}
-
-def playerAnimatorFabric = file("libs/player-animation-lib-fabric.jar")
-
-tasks.matching { it.name in ["runClient", "runServer"] }.configureEach {
-    doFirst {
-        def modsDir = file("run/mods")
-        modsDir.mkdirs()
-        // Prefer Maven-resolved jar; fall back to libs/ copy for IDE runs.
-        def fromMaven = configurations.findByName("modImplementation")?.files?.find {
-            it.name.contains("player-animation-lib-fabric")
-        }
-        def src = fromMaven ?: (playerAnimatorFabric.exists() ? playerAnimatorFabric : null)
-        if (src != null) {
-            copy {
-                from src
-                into modsDir
-                rename { "player-animation-lib-fabric.jar" }
-            }
-        }
-    }
 }
 
 loom {

@@ -93,8 +93,8 @@ public final class ParkourPlayer {
     public int cornerLock;
     /** Grace ticks before releasing when hold scan misses for a frame. */
     public int missHoldTicks;
-    /** Body yaw while orbiting a chain/pole (degrees). */
-    public float climbYaw;
+    /** Body yaw while orbiting a chain/pole (degrees). NaN when unused — 0 would face south. */
+    public float climbYaw = Float.NaN;
     /** Angle around the pole, in degrees. Kept on its own so a missed step cannot undo the turn. */
     public float orbitAngle = Float.NaN;
     /** Remaining downward slide (blocks) after grabbing mid-fall. */
@@ -168,6 +168,7 @@ public final class ParkourPlayer {
         this.cornerFacing = null;
         this.cornerLock = 0;
         this.turnYaw = Float.NaN;
+        this.climbYaw = Float.NaN;
         this.toolClimb = false;
         this.toolStrike = 0;
         this.toolArm = 0;

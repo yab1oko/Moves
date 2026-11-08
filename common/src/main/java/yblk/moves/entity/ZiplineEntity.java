@@ -298,7 +298,7 @@ public class ZiplineEntity extends Entity {
             t = closestT(player.getEyePosition());
         }
         // LMB knocks off lanterns / banners / signs aimed at on the cable.
-        if (takeHanging(t)) {
+        if (takeHanging(t, false)) {
             return true;
         }
         if (player.isShiftKeyDown()) {
@@ -388,6 +388,10 @@ public class ZiplineEntity extends Entity {
         if (!player.swinging) {
             return;
         }
+        // RMB place also swings — don't treat that as knocking decor off.
+        if (isHangingDecor(player.getMainHandItem()) || isHangingDecor(player.getOffhandItem())) {
+            return;
+        }
         ZiplineEntity line = nearest(player.level(), player.getEyePosition(), 6.0);
         if (line == null || !line.aimed(player, 5.0, 0.45)) {
             return;
@@ -396,12 +400,21 @@ public class ZiplineEntity extends Entity {
         if (t < 0.0) {
             t = line.closestT(player.getEyePosition());
         }
-        if (line.takeHanging(t)) {
+        if (line.takeHanging(t, false)) {
             return;
         }
         if (player.isShiftKeyDown()) {
             line.breakLine();
         }
+    }
+
+    private static boolean isHangingDecor(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return false;
+        }
+        return stack.is(Items.LANTERN) || stack.is(Items.SOUL_LANTERN)
+                || stack.getItem() instanceof BannerItem
+                || stack.getItem() instanceof HangingSignItem;
     }
 
     public boolean aimed(Player player, double reach, double radius) {
@@ -639,6 +652,8 @@ public class ZiplineEntity extends Entity {
     }
 
     private int useTick = -100;
+    /** Ignore swing/LMB knock-off for a few ticks after placing (RMB also swings the arm). */
+    private int hangProtectUntil = -1;
 
     private InteractionResult handleUse(Player player, InteractionHand hand, double t) {
         if (this.tickCount == this.useTick) {
@@ -677,7 +692,7 @@ public class ZiplineEntity extends Entity {
         if (this.level().isClientSide()) {
             return InteractionResult.SUCCESS;
         }
-        if (player.isShiftKeyDown() && takeHanging(t)) {
+        if (player.isShiftKeyDown() && takeHanging(t, true)) {
             this.useTick = this.tickCount;
             return InteractionResult.CONSUME;
         }
@@ -696,6 +711,8 @@ public class ZiplineEntity extends Entity {
             index = addLantern(t, soul);
         }
         this.useTick = this.tickCount;
+        // Arm swing from this use must not immediately knock the hanging off.
+        this.hangProtectUntil = this.tickCount + 10;
         if (!player.getAbilities().instabuild) {
             stack.shrink(1);
         }
@@ -720,7 +737,13 @@ public class ZiplineEntity extends Entity {
         return best;
     }
 
-    private boolean takeHanging(double t) {
+    /**
+     * @param force when true (shift+RMB take), ignore the post-place swing protect window
+     */
+    private boolean takeHanging(double t, boolean force) {
+        if (!force && this.tickCount <= this.hangProtectUntil) {
+            return false;
+        }
         int best = nearestHanging(t, null, 0.14);
         if (best < 0) {
             return false;
@@ -753,19 +776,44 @@ public class ZiplineEntity extends Entity {
         };
     }
 
+    /** Invisible light for hanging lanterns — never waterlogged (that looks like dripping water). */
+    private static BlockState lanternLight() {
+        return Blocks.LIGHT.defaultBlockState()
+                .setValue(LightBlock.LEVEL, 15)
+                .setValue(LightBlock.WATERLOGGED, false);
+    }
+
     private void hangLight(CompoundTag one, double t) {
         Vec3 body = point(t).add(0.0, -0.7, 0.0);
-        BlockPos pos = BlockPos.containing(body);
-        if (!this.level().getBlockState(pos).isAir()) {
-            pos = BlockPos.containing(point(t));
-        }
-        if (!this.level().getBlockState(pos).isAir()) {
+        BlockPos pos = pickLightPos(body, point(t));
+        if (pos == null) {
             return;
         }
-        this.level().setBlock(pos, Blocks.LIGHT.defaultBlockState().setValue(LightBlock.LEVEL, 15), 3);
+        this.level().setBlock(pos, lanternLight(), 3);
         one.putInt("lx", pos.getX());
         one.putInt("ly", pos.getY());
         one.putInt("lz", pos.getZ());
+    }
+
+    private BlockPos pickLightPos(Vec3 preferred, Vec3 fallback) {
+        BlockPos first = BlockPos.containing(preferred);
+        if (canHostLanternLight(first)) {
+            return first;
+        }
+        BlockPos second = BlockPos.containing(fallback);
+        if (canHostLanternLight(second)) {
+            return second;
+        }
+        return null;
+    }
+
+    private boolean canHostLanternLight(BlockPos pos) {
+        BlockState state = this.level().getBlockState(pos);
+        if (!state.isAir() && !state.is(Blocks.LIGHT)) {
+            return false;
+        }
+        // Fluid in the cell would waterlog Light and spawn drip/splash particles.
+        return this.level().getFluidState(pos).isEmpty();
     }
 
     private void clearLight(CompoundTag one) {
@@ -801,8 +849,15 @@ public class ZiplineEntity extends Entity {
                 continue;
             }
             BlockPos pos = new BlockPos(one.getInt("lx"), one.getInt("ly"), one.getInt("lz"));
-            if (this.level().isLoaded(pos) && this.level().getBlockState(pos).isAir()) {
-                this.level().setBlock(pos, Blocks.LIGHT.defaultBlockState().setValue(LightBlock.LEVEL, 15), 3);
+            if (!this.level().isLoaded(pos)) {
+                continue;
+            }
+            BlockState state = this.level().getBlockState(pos);
+            if (state.isAir() && this.level().getFluidState(pos).isEmpty()) {
+                this.level().setBlock(pos, lanternLight(), 3);
+            } else if (state.is(Blocks.LIGHT) && state.getValue(LightBlock.WATERLOGGED)) {
+                // Neighbor water can waterlog light blocks — dry them so drips stop.
+                this.level().setBlock(pos, lanternLight(), 3);
             }
         }
         if (changed) {

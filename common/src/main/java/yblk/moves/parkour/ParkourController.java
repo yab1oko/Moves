@@ -894,6 +894,8 @@ public final class ParkourController {
         double baseY = player.onGround() ? player.getY() : data.jumpStartY;
         data.grabRise = Math.max(0.5, data.anchorTop - baseY);
         data.mode = ParkourMode.LEDGE;
+        // Drop stale climb yaw — PULLUP body lock prefers climbYaw and would spin 180°.
+        data.climbYaw = Float.NaN;
         data.actionTicks = 0;
         data.goalPos = fittedLedge;
         data.motion = Vec3.ZERO;
@@ -1069,9 +1071,7 @@ public final class ParkourController {
                 && spend(player, data, MovesConfig.get().pullUpCost)) {
             data.pullDuration = pullTicksForRise(data.grabRise);
             data.pullLocked = true;
-            data.mode = ParkourMode.PULLUP;
-            data.actionTicks = 0;
-            data.pullStart = player.position();
+            beginLedgePullup(data, player.position());
             markDirty(data);
             return;
         }
@@ -1168,9 +1168,7 @@ public final class ParkourController {
                         && spend(player, data, MovesConfig.get().pullUpCost)) {
                     data.pullDuration = pullTicksForRise(data.grabRise);
                     data.pullLocked = true;
-                    data.mode = ParkourMode.PULLUP;
-                    data.actionTicks = 0;
-                    data.pullStart = player.position();
+                    beginLedgePullup(data, player.position());
                     markDirty(data);
                     return;
                 }
@@ -1393,6 +1391,16 @@ public final class ParkourController {
         }
         return HangBlocks.open(level, hang)
                 && (HangBlocks.open(level, hang.above()) || HangBlocks.open(level, solid.above()));
+    }
+
+    /** Ledge/stair hang → pull-up. Keep climbYaw = into-wall so body lock matches the hang. */
+    private static void beginLedgePullup(ParkourPlayer data, Vec3 start) {
+        if (data.facing != null && data.facing.getAxis().isHorizontal()) {
+            data.climbYaw = data.facing.toYRot();
+        }
+        data.mode = ParkourMode.PULLUP;
+        data.actionTicks = 0;
+        data.pullStart = start;
     }
 
     private static void tickPullup(Player player, ParkourPlayer data) {
@@ -1630,7 +1638,9 @@ public final class ParkourController {
                 && player.getBoundingBox().maxY >= capNow.getY() - 0.35) {
             data.anchor = capNow.immutable();
             data.anchorTop = lip(level, capNow);
+            // climbYaw is already into-wall; keep facing + body lock on that yaw.
             data.facing = Direction.fromYRot(data.climbYaw);
+            data.climbYaw = data.facing.toYRot();
             data.pullDuration = pullTicksForLook(player);
             data.pullLocked = true;
             data.pullGrabMiss = 0;
@@ -1674,7 +1684,9 @@ public final class ParkourController {
                         && player.getBoundingBox().maxY >= cap.getY() - 0.2) {
                     data.anchor = cap.immutable();
                     data.anchorTop = lip(level, cap);
+                    // climbYaw is already into-wall; keep facing + body lock on that yaw.
                     data.facing = Direction.fromYRot(data.climbYaw);
+                    data.climbYaw = data.facing.toYRot();
                     data.pullDuration = pullTicksForLook(player);
                     data.pullLocked = true;
                     data.mode = ParkourMode.PULLUP;
