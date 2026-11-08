@@ -8,6 +8,7 @@
         "${mod_author}"
     ],
     "license": "${license}",
+    "icon": "assets/moves/icon.png",
     "environment": "*",
     "entrypoints": {
         "main": [
@@ -15,6 +16,9 @@
         ],
         "client": [
             "yblk.moves.MovesClientMod"
+        ],
+        "modmenu": [
+            "yblk.moves.client.MovesModMenu"
         ]
     },
     "mixins": [
@@ -28,6 +32,7 @@
         "java": ">=17"
     },
     "suggests": {
-        "player-animator": "*"
+        "player-animator": "*",
+        "modmenu": "*"
     }
 }
