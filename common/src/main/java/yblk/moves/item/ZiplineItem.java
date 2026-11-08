@@ -71,8 +71,10 @@ public class ZiplineItem extends Item {
         }
         BlockPos clicked = context.getClickedPos();
         Vec3 click = context.getClickLocation();
-        BlockPos pos = nearestPost(level, clicked, click);
-        Direction face = pos.equals(clicked) ? context.getClickedFace() : Direction.UP;
+        Direction clickedFace = context.getClickedFace();
+        Target target = resolveTarget(level, clicked, clickedFace, click);
+        BlockPos pos = target.pos;
+        Direction face = target.face;
         ItemStack stack = context.getItemInHand();
         CompoundTag tag = stack.getOrCreateTag();
         if (!tag.contains("Ax")) {
@@ -89,7 +91,7 @@ public class ZiplineItem extends Item {
             if (looked != null) {
                 pos = looked;
                 face = Direction.UP;
-                double keepY = tag.contains("Ah") ? tag.getFloat("Ah") : pos.getY() + 0.78;
+                double keepY = matchedPostY(tag, pos);
                 click = new Vec3(pos.getX() + 0.5, keepY, pos.getZ() + 0.5);
             } else {
                 BlockPos other = nearestPostExcept(level, clicked, click, first);
@@ -99,7 +101,7 @@ public class ZiplineItem extends Item {
                 }
                 pos = other;
                 face = Direction.UP;
-                double keepY = tag.contains("Ah") ? tag.getFloat("Ah") : pos.getY() + 0.78;
+                double keepY = matchedPostY(tag, pos);
                 click = new Vec3(pos.getX() + 0.5, keepY, pos.getZ() + 0.5);
             }
         }
@@ -147,49 +149,81 @@ public class ZiplineItem extends Item {
         return InteractionResult.CONSUME;
     }
 
-    private static BlockPos nearestPost(Level level, BlockPos clicked, Vec3 click) {
+    /**
+     * Same block the player clicked, unless they clicked the top of a block that
+     * carries a fence/wall — then snap to that post. Never hunt posts 2+ up.
+     */
+    public static Target resolveTarget(Level level, BlockPos clicked, Direction face, Vec3 click) {
         if (isPost(level, clicked)) {
-            return clicked;
+            return new Target(clicked, face);
         }
+        // Top of a block under a post → attach to that post (not to the floor cell).
+        if (face == Direction.UP && isPost(level, clicked.above())) {
+            return new Target(clicked.above(), Direction.UP);
+        }
+        // Tall fence collision sometimes reports the air/solid cell above the post.
+        if (isPost(level, clicked.below()) && click.y < clicked.getY() + 0.05) {
+            return new Target(clicked.below(), face == Direction.DOWN ? Direction.UP : face);
+        }
+        BlockPos neighbor = nearestSameLevelPost(level, clicked, click);
+        if (neighbor != null) {
+            return new Target(neighbor, Direction.UP);
+        }
+        return new Target(clicked, face);
+    }
+
+    private static BlockPos nearestSameLevelPost(Level level, BlockPos clicked, Vec3 click) {
         BlockPos best = null;
-        double bestDist = 1.35 * 1.35;
-        for (int dy = -1; dy <= 2; dy++) {
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    BlockPos pos = clicked.offset(dx, dy, dz);
-                    if (!isPost(level, pos)) {
-                        continue;
-                    }
-                    double dist = click.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.55, pos.getZ() + 0.5);
-                    if (dist < bestDist) {
-                        bestDist = dist;
-                        best = pos;
-                    }
+        double bestDist = 1.15 * 1.15;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) {
+                    continue;
+                }
+                BlockPos pos = clicked.offset(dx, 0, dz);
+                if (!isPost(level, pos)) {
+                    continue;
+                }
+                double dist = click.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.55, pos.getZ() + 0.5);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best = pos;
                 }
             }
         }
-        return best != null ? best : clicked;
+        return best;
     }
 
     private static BlockPos nearestPostExcept(Level level, BlockPos clicked, Vec3 click, BlockPos skip) {
         BlockPos best = null;
-        double bestDist = 3.5 * 3.5;
-        for (int dy = -1; dy <= 3; dy++) {
+        double bestScore = Double.MAX_VALUE;
+        for (int dy = -1; dy <= 1; dy++) {
             for (int dx = -4; dx <= 4; dx++) {
                 for (int dz = -4; dz <= 4; dz++) {
                     BlockPos pos = clicked.offset(dx, dy, dz);
                     if (pos.equals(skip) || !isPost(level, pos)) {
                         continue;
                     }
-                    double dist = click.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.55, pos.getZ() + 0.5);
-                    if (dist < bestDist) {
-                        bestDist = dist;
+                    double dyClick = (pos.getY() + 0.55) - click.y;
+                    // Prefer the post at the clicked height — do not jump a stacked segment up.
+                    double score = click.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.55, pos.getZ() + 0.5)
+                            + dyClick * dyClick * 8.0;
+                    if (score < bestScore) {
+                        bestScore = score;
                         best = pos;
                     }
                 }
             }
         }
         return best;
+    }
+
+    private static double matchedPostY(CompoundTag tag, BlockPos pos) {
+        double keepY = tag.contains("Ah") ? tag.getFloat("Ah") : pos.getY() + 0.78;
+        return Mth.clamp(keepY, pos.getY() + 0.35, pos.getY() + 0.92);
+    }
+
+    public record Target(BlockPos pos, Direction face) {
     }
 
     private static BlockPos postAlongLook(Player player, BlockPos skip) {
@@ -247,8 +281,8 @@ public class ZiplineItem extends Item {
     }
 
     /**
-     * Posts always attach — never reject with "too close to the ground".
-     * Height follows the click, clamped to the post body.
+     * Posts always attach — height follows the click, clamped to the post body.
+     * Solid blocks stay on the clicked face; never lift into the block above.
      */
     public static Vec3 attachPoint(Level level, BlockPos pos, Direction face, Vec3 click) {
         BlockState state = level.getBlockState(pos);
@@ -257,15 +291,23 @@ public class ZiplineItem extends Item {
             y = Mth.clamp(y, pos.getY() + 0.35, pos.getY() + 0.92);
             return new Vec3(pos.getX() + 0.5, y, pos.getZ() + 0.5);
         }
+        var shape = state.getCollisionShape(level, pos);
+        double minY = pos.getY() + (shape.isEmpty() ? 0.05 : Math.max(0.05, shape.min(Direction.Axis.Y)));
+        double maxY = pos.getY() + (shape.isEmpty() ? 0.95 : Math.min(0.95, shape.max(Direction.Axis.Y)));
+        if (maxY <= minY) {
+            maxY = minY + 0.05;
+        }
+        if (face == Direction.UP) {
+            double top = shape.isEmpty() ? 1.0 : shape.max(Direction.Axis.Y);
+            return new Vec3(pos.getX() + 0.5, pos.getY() + top + 0.02, pos.getZ() + 0.5);
+        }
+        if (face == Direction.DOWN) {
+            double bottom = shape.isEmpty() ? 0.0 : shape.min(Direction.Axis.Y);
+            return new Vec3(pos.getX() + 0.5, pos.getY() + bottom - 0.02, pos.getZ() + 0.5);
+        }
         Vec3 point = facePoint(pos, face);
-        if (click != null && face.getAxis().isHorizontal()) {
-            point = new Vec3(point.x, click.y, point.z);
-        }
-        double floor = floorTop(level, point.x, point.y, point.z);
-        if (point.y < floor + 0.35) {
-            point = new Vec3(point.x, floor + 0.35, point.z);
-        }
-        return point;
+        double y = click != null ? Mth.clamp(click.y, minY, maxY) : Mth.clamp(point.y, minY, maxY);
+        return new Vec3(point.x, y, point.z);
     }
 
     private static Vec3 restoreAttach(Level level, BlockPos pos, Direction face, double height) {
@@ -273,23 +315,7 @@ public class ZiplineItem extends Item {
             double y = Mth.clamp(height, pos.getY() + 0.35, pos.getY() + 0.92);
             return new Vec3(pos.getX() + 0.5, y, pos.getZ() + 0.5);
         }
-        Vec3 point = facePoint(pos, face);
-        return new Vec3(point.x, height, point.z);
-    }
-
-    private static double floorTop(Level level, double x, double y, double z) {
-        BlockPos under = BlockPos.containing(x, y - 0.05, z);
-        double best = level.getMinBuildHeight();
-        for (int i = 0; i <= 3; i++) {
-            BlockPos pos = under.below(i);
-            var shape = level.getBlockState(pos).getCollisionShape(level, pos);
-            if (shape.isEmpty() || isPost(level, pos)) {
-                continue;
-            }
-            best = Math.max(best, pos.getY() + shape.max(Direction.Axis.Y));
-            break;
-        }
-        return best;
+        return attachPoint(level, pos, face, new Vec3(pos.getX() + 0.5, height, pos.getZ() + 0.5));
     }
 
     private static boolean conflicts(Level level, Vec3 a, Vec3 b) {

@@ -440,8 +440,10 @@ public final class ParkourController {
         if (!data.mode.locksBody()) {
             return Float.NaN;
         }
-        if (data.mode == ParkourMode.CLIMB) {
-            return data.climbYaw;
+        if (data.mode == ParkourMode.CLIMB || data.mode == ParkourMode.PULLUP) {
+            if (!Float.isNaN(data.climbYaw)) {
+                return data.climbYaw;
+            }
         }
         if (data.mode == ParkourMode.LEDGE && data.cornerVia != null && !Float.isNaN(data.turnYaw)) {
             return data.turnYaw;
@@ -462,18 +464,21 @@ public final class ParkourController {
         player.setYBodyRot(yaw);
     }
 
-    /** Feet on the open side of a fence or bar wall, outside the cell, on the side the body already is. */
-    private static Vec3 wallCling(Player player, BlockPos hold, Direction.Axis axis, double feetY) {
+    /**
+     * Feet on the open side of a fence/bar wall. Side comes from climbYaw so an edge
+     * jitter across the thin post cannot flip the body 180°.
+     */
+    private static Vec3 wallCling(Player player, BlockPos hold, Direction.Axis axis, double feetY, float climbYaw) {
         double off = ParkourTuning.CLING_GAP;
-        double center = axis == Direction.Axis.X ? hold.getZ() + 0.5 : hold.getX() + 0.5;
-        double playerSide = axis == Direction.Axis.X ? player.getZ() : player.getX();
-        double sign = Math.signum(playerSide - center);
+        double sign = Math.signum(sideFromYaw(climbYaw, axis, 1.0));
         if (sign == 0.0) {
-            sign = 1.0;
+            double center = axis == Direction.Axis.X ? hold.getZ() + 0.5 : hold.getX() + 0.5;
+            double playerSide = axis == Direction.Axis.X ? player.getZ() : player.getX();
+            sign = playerSide >= center ? 1.0 : -1.0;
         }
         double along = axis == Direction.Axis.X ? player.getX() : player.getZ();
-        along = Mth.clamp(along, (axis == Direction.Axis.X ? hold.getX() : hold.getZ()) + 0.18,
-                (axis == Direction.Axis.X ? hold.getX() : hold.getZ()) + 0.82);
+        along = Mth.clamp(along, (axis == Direction.Axis.X ? hold.getX() : hold.getZ()) + 0.05,
+                (axis == Direction.Axis.X ? hold.getX() : hold.getZ()) + 0.95);
         double lat = sign * off;
         double gx = axis == Direction.Axis.X ? along : hold.getX() + 0.5 + lat;
         double gz = axis == Direction.Axis.Z ? along : hold.getZ() + 0.5 + lat;
@@ -1025,8 +1030,10 @@ public final class ParkourController {
         }
         Direction.Axis placeAxis = wallAxis(player.level(), hold, data.climbYaw);
         if (placeAxis != null && HangBlocks.isFenceOrBars(player.level().getBlockState(hold))) {
-            data.goalPos = wallCling(player, hold, placeAxis, player.getY());
+            data.climbWall = true;
+            data.goalPos = wallCling(player, hold, placeAxis, player.getY(), data.climbYaw);
         } else {
+            data.climbWall = false;
             data.goalPos = climbStandPos(player.level(), hold, data.climbYaw, player.getY());
         }
         data.motion = Vec3.ZERO;
@@ -1697,29 +1704,35 @@ public final class ParkourController {
             drain(player, data, MovesConfig.get().climbDrain * 0.12F);
         }
 
-        // Poles keep the side the body is already on. Yaw changes only after the feet actually move.
+        // Poles orbit. Fence/bar walls (including the end post) only shimmy — never orbit.
         double off = climbOffset(level, hold);
         Direction.Axis axis = wallAxis(level, hold, data.climbYaw);
         boolean barsOrFence = HangBlocks.isFenceOrBars(level.getBlockState(hold));
         boolean pole = HangBlocks.isPole(level.getBlockState(hold));
-        int neighbors = barsOrFence ? columnNeighbors(level, hold) : 2;
-        boolean endPost = barsOrFence && neighbors <= 1;
-        data.climbWall = barsOrFence && axis != null && !endPost;
-        if (data.climbWall && axis != null) {
-            double side = axis == Direction.Axis.X
-                    ? player.getZ() - (hold.getZ() + 0.5)
-                    : player.getX() - (hold.getX() + 0.5);
-            Direction into = axis == Direction.Axis.X
-                    ? (side >= 0.0 ? Direction.NORTH : Direction.SOUTH)
-                    : (side >= 0.0 ? Direction.WEST : Direction.EAST);
-            data.climbYaw = into.toYRot();
+        boolean wallRun = barsOrFence && axis != null;
+        data.climbWall = wallRun;
+        if (wallRun) {
+            Direction into = Direction.fromYRot(data.climbYaw);
+            // Keep the latched wall-facing yaw. Only re-derive if it somehow runs along the wall.
+            if (into.getAxis() == axis) {
+                double side = axis == Direction.Axis.X
+                        ? player.getZ() - (hold.getZ() + 0.5)
+                        : player.getX() - (hold.getX() + 0.5);
+                if (Math.abs(side) < 0.02) {
+                    side = 1.0;
+                }
+                into = axis == Direction.Axis.X
+                        ? (side >= 0.0 ? Direction.NORTH : Direction.SOUTH)
+                        : (side >= 0.0 ? Direction.WEST : Direction.EAST);
+                data.climbYaw = into.toYRot();
+            }
             data.facing = into;
         }
         boolean strafing = Math.abs(data.input.strafe) > 0.2F && data.climbSlide <= 0.0;
         double sign = data.input.strafe > 0.0F ? 1.0 : -1.0;
         BlockPos nextHold = hold;
         Vec3 goal = null;
-        if (pole || axis == null || endPost) {
+        if (pole || !wallRun && axis == null) {
             goal = poleStep(hold, player, data, off, nextY, strafing, sign);
         } else if (strafing && axis != null) {
             Vec3 camLeft = leftOf(horizontalLook(player));
@@ -1733,11 +1746,12 @@ public final class ParkourController {
                 dir = (int) Math.signum(onAxis * data.input.strafe);
             }
             if (dir != 0) {
-                double centerSide = axis == Direction.Axis.X ? hold.getZ() + 0.5 : hold.getX() + 0.5;
-                double playerSide = axis == Direction.Axis.X ? player.getZ() : player.getX();
-                double sideSign = Math.signum(playerSide - centerSide);
+                // Prefer latched climbYaw — position across a thin end post flips and spins the body.
+                double sideSign = Math.signum(sideFromYaw(data.climbYaw, axis, off));
                 if (sideSign == 0.0) {
-                    sideSign = Math.signum(sideFromYaw(data.climbYaw, axis, off));
+                    double centerSide = axis == Direction.Axis.X ? hold.getZ() + 0.5 : hold.getX() + 0.5;
+                    double playerSide = axis == Direction.Axis.X ? player.getZ() : player.getX();
+                    sideSign = Math.signum(playerSide - centerSide);
                 }
                 if (sideSign == 0.0) {
                     sideSign = 1.0;
@@ -1777,7 +1791,7 @@ public final class ParkourController {
         }
         if (goal == null) {
             Vec3 stay = axis != null
-                    ? wallCling(player, hold, axis, nextY)
+                    ? wallCling(player, hold, axis, nextY, data.climbYaw)
                     : climbStandPos(level, hold, data.climbYaw, nextY);
             // A failed fit used to leave the body inside the link. Thin grips are placed at the gap anyway.
             if (climbFits(player, stay, hold) || pole || barsOrFence) {
@@ -2159,16 +2173,6 @@ public final class ParkourController {
         return HangBlocks.canHold(level, pos.relative(dir))
                 || HangBlocks.canHold(level, pos.above().relative(dir))
                 || HangBlocks.canHold(level, pos.below().relative(dir));
-    }
-
-    private static int columnNeighbors(Level level, BlockPos pos) {
-        int n = 0;
-        for (Direction dir : Direction.Plane.HORIZONTAL) {
-            if (sideHold(level, pos, dir)) {
-                n++;
-            }
-        }
-        return n;
     }
 
     /** X or Z when this post connects to another. Null for a chain or a lone fence post. */
@@ -3323,6 +3327,14 @@ public final class ParkourController {
     private static void beginToolPullup(Player player, ParkourPlayer data) {
         if (!spend(player, data, MovesConfig.get().pullUpCost)) {
             return;
+        }
+        // Tool climb stores the hit face (outward). Pull-up / body lock use into-wall facing —
+        // without the flip the pullup clip yaws the body 180°.
+        if (data.facing != null && data.facing.getAxis().isHorizontal()) {
+            data.facing = data.facing.getOpposite();
+        }
+        if (data.facing != null) {
+            data.climbYaw = data.facing.toYRot();
         }
         data.anchorTop = data.anchor.getY() + 1.0;
         data.pullDuration = pullTicksForLook(player);

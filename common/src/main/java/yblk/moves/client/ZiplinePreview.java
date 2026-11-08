@@ -53,7 +53,9 @@ public final class ZiplinePreview {
         HitResult hit = minecraft.level.clip(new ClipContext(eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
         Vec3 target = end;
         if (hit instanceof BlockHitResult block && block.getType() == HitResult.Type.BLOCK) {
-            Vec3 at = ZiplineItem.attachPoint(minecraft.level, block.getBlockPos(), block.getDirection(), block.getLocation());
+            ZiplineItem.Target resolved = ZiplineItem.resolveTarget(
+                    minecraft.level, block.getBlockPos(), block.getDirection(), block.getLocation());
+            Vec3 at = ZiplineItem.attachPoint(minecraft.level, resolved.pos(), resolved.face(), block.getLocation());
             if (at != null) {
                 target = at;
             }

@@ -1,5 +1,6 @@
 package yblk.moves.mixin;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiGraphics;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,11 +19,11 @@ public class GuiStaminaMixin {
 
     @Inject(method = "renderPlayerHealth", at = @At("TAIL"))
     private void moves$staminaHealth(GuiGraphics graphics, CallbackInfo ci) {
-        StaminaHud.render(graphics);
+        StaminaHud.render(graphics, Minecraft.getInstance().getFrameTime());
     }
 
     @Inject(method = "render", at = @At("RETURN"))
     private void moves$staminaEnd(GuiGraphics graphics, float partialTick, CallbackInfo ci) {
-        StaminaHud.render(graphics);
+        StaminaHud.render(graphics, partialTick);
     }
 }

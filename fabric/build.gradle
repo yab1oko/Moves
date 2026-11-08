@@ -19,21 +19,24 @@ dependencies {
     modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
     implementation group: 'com.google.code.findbugs', name: 'jsr305', version: '3.0.1'
     implementation project(":common")
-    // Runtime + compile. Loom puts this on the game classpath; the copy below
-    // also covers IntelliJ run configs that skip Loom's mod resolution.
-    modImplementation "dev.kosmx.player-anim:player-animation-lib-fabric:1.0.2-rc1+1.20"
-    include "dev.kosmx.player-anim:player-animation-lib-fabric:1.0.2-rc1+1.20"
+    // Compile + nest Player Animator inside the Fabric jar (jar-in-jar).
+    modImplementation include("dev.kosmx.player-anim:player-animation-lib-fabric:1.0.2-rc1+1.20")
 }
 
 def playerAnimatorFabric = file("libs/player-animation-lib-fabric.jar")
 
 tasks.matching { it.name in ["runClient", "runServer"] }.configureEach {
     doFirst {
-        if (playerAnimatorFabric.exists()) {
-            def modsDir = file("run/mods")
-            modsDir.mkdirs()
+        def modsDir = file("run/mods")
+        modsDir.mkdirs()
+        // Prefer Maven-resolved jar; fall back to libs/ copy for IDE runs.
+        def fromMaven = configurations.findByName("modImplementation")?.files?.find {
+            it.name.contains("player-animation-lib-fabric")
+        }
+        def src = fromMaven ?: (playerAnimatorFabric.exists() ? playerAnimatorFabric : null)
+        if (src != null) {
             copy {
-                from playerAnimatorFabric
+                from src
                 into modsDir
                 rename { "player-animation-lib-fabric.jar" }
             }

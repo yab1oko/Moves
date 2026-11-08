@@ -52,7 +52,7 @@ public final class MovesForgeClient {
             }
             // Ensure we can draw even if Gui mixin beginFrame was skipped this path.
             StaminaHud.beginFrame();
-            StaminaHud.render(event.getGuiGraphics());
+            StaminaHud.render(event.getGuiGraphics(), event.getPartialTick());
         }
 
         @SubscribeEvent

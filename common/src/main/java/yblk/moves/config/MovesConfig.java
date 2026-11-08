@@ -42,7 +42,7 @@ public final class MovesConfig {
             + "zipline (true) — grab a rope or chain.\n"
             + "\n"
             + "Costs, default in parentheses:\n"
-            + "sprintDrain (0.25) — sprint, per tick, including while jumping.\n"
+            + "sprintDrain (0.12) — sprint, per tick, including while jumping.\n"
             + "jumpCost (6) — a normal jump, once.\n"
             + "enhancedJumpCost (22) — a charged jump, once.\n"
             + "grabCost (10) — grab a ledge, chain, or ceiling.\n"

@@ -11,12 +11,11 @@ import yblk.moves.parkour.ParkourPlayer;
 import yblk.moves.parkour.ParkourTuning;
 
 /**
- * Smart Moving–style input:
- * - Charged jump: hold Shift + Space to charge, release Space to jump
- * - Grab: hold Grab key (default RMB)
+ * - Charged jump: Shift + Space (full charge), works with items
+ * - Grab: Grab key (default RMB); empty / climb-tool / zipline hands
  * - Dodge: WASD + Alt
- * - Prone: Prone key toggle (default C), or Ctrl+Shift
- * - Slide: Slide key (default X), or Sprint+Shift rising edge
+ * - Prone: unbound → Ctrl+Shift; rebound → that key (Control bind still needs Shift)
+ * - Slide: unbound → Shift while sprinting with Ctrl held; never steals plain sneak
  */
 public final class ClientParkourInput {
 
@@ -35,19 +34,13 @@ public final class ClientParkourInput {
         boolean shift = minecraft.options.keyShift.isDown();
         boolean ctrl = minecraft.options.keySprint.isDown();
         boolean jump = minecraft.options.keyJump.isDown();
-        boolean dodgeKey = MovesKeybinds.DODGE.isDown();
-        boolean grabKey = MovesKeybinds.GRAB.isDown();
-        boolean proneKey = MovesKeybinds.PRONE.isDown();
-        boolean slideKey = MovesKeybinds.SLIDE.isDown();
+        boolean dodgeKey = MovesKeybinds.isActive(MovesKeybinds.DODGE);
+        boolean grabKey = MovesKeybinds.isActive(MovesKeybinds.GRAB);
+        boolean proneKey = MovesKeybinds.isActive(MovesKeybinds.PRONE);
+        boolean slideKey = MovesKeybinds.isActive(MovesKeybinds.SLIDE);
         boolean sprinting = player.isSprinting();
-        // Ctrl+Shift toggles crawl only when standing. During a sprint or a slide it is the slide key.
-        boolean combo = shift && ctrl && !sprinting
-                && data.mode != ParkourMode.SLIDE
-                && data.slideCooldown <= 0
-                && data.recentSprintTicks <= 0;
 
         MovesConfig cfg = MovesConfig.get();
-        // Anything in the main hand is for building/use. Parkour must not eat RMB or Shift.
         ItemStack main = player.getMainHandItem();
         boolean lineHands = data.mode == ParkourMode.ZIPLINE
                 || main.is(net.minecraft.tags.ItemTags.PICKAXES)
@@ -55,10 +48,40 @@ public final class ClientParkourInput {
         boolean holding = !main.isEmpty()
                 && !yblk.moves.item.ClimbGear.equipped(player)
                 && !lineHands;
-        if (cfg.crawl && ((combo && !data.prevProneCombo) || (proneKey && !data.prevProneKey))) {
+
+        boolean wasProneCombo = data.prevProneCombo;
+        boolean wasSneak = data.prevSneak;
+        boolean wasProneKey = data.prevProneKey;
+        boolean proneBound = MovesKeybinds.isBound(MovesKeybinds.PRONE);
+        boolean slideBound = MovesKeybinds.isBound(MovesKeybinds.SLIDE);
+
+        boolean proneEdge = false;
+        if (cfg.crawl && !jump) {
+            if (!proneBound) {
+                // Default: Ctrl+Shift while standing.
+                boolean chord = shift && ctrl && !sprinting
+                        && data.recentSprintTicks <= 0
+                        && data.mode != ParkourMode.SLIDE
+                        && data.slideCooldown <= 0;
+                proneEdge = chord && !wasProneCombo;
+                data.prevProneCombo = chord;
+            } else if (MovesKeybinds.isCtrlKey(MovesKeybinds.PRONE)) {
+                boolean chord = proneKey && shift && !sprinting
+                        && data.recentSprintTicks <= 0
+                        && data.mode != ParkourMode.SLIDE
+                        && data.slideCooldown <= 0;
+                proneEdge = chord && !wasProneCombo;
+                data.prevProneCombo = chord;
+            } else {
+                proneEdge = proneKey && !wasProneKey;
+                data.prevProneCombo = false;
+            }
+        } else {
+            data.prevProneCombo = false;
+        }
+        if (proneEdge) {
             data.proneLatch = !data.proneLatch;
         }
-        data.prevProneCombo = combo;
         data.prevProneKey = proneKey;
         if (!cfg.crawl) {
             data.proneLatch = false;
@@ -85,14 +108,14 @@ public final class ClientParkourInput {
         boolean enhanced = false;
         boolean charging = false;
         boolean modeOk = data.mode == ParkourMode.NONE && !data.proneLatch;
-        // Don't charge jump while sprinting — Shift then starts a slide instead.
-        boolean canCharge = cfg.chargedJump && !holding && shift && !combo && modeOk && player.onGround()
+        boolean canCharge = cfg.chargedJump && shift && modeOk && player.onGround()
                 && !player.isSprinting();
         if (canCharge && jump) {
             data.jumpCharge = Math.min(ParkourTuning.JUMP_CHARGE_TICKS, data.jumpCharge + 1);
             charging = true;
         } else if (data.prevJump && !jump && data.jumpCharge > 0) {
-            if (cfg.chargedJump && modeOk && player.onGround() && data.jumpCharge >= 4 && shift) {
+            if (cfg.chargedJump && modeOk && player.onGround()
+                    && data.jumpCharge >= ParkourTuning.JUMP_CHARGE_TICKS && shift) {
                 enhanced = true;
             }
             data.jumpCharge = 0;
@@ -100,7 +123,7 @@ public final class ClientParkourInput {
             data.jumpCharge = 0;
         }
 
-        if (cfg.chargedJump && !holding && jump && !data.prevJump && modeOk && data.climbBoostTicks > 0
+        if (cfg.chargedJump && jump && !data.prevJump && modeOk && data.climbBoostTicks > 0
                 && shift && player.onGround()) {
             enhanced = true;
             data.jumpCharge = 0;
@@ -113,10 +136,18 @@ public final class ClientParkourInput {
             player.setJumping(false);
         }
 
-        boolean slidePulse = cfg.slide && !data.proneLatch && data.mode == ParkourMode.NONE
-                && ((slideKey && !data.prevSlideKey)
-                || (shift && !data.prevSneak && (sprinting || data.recentSprintTicks > 0) && !combo && !jump
-                && data.jumpCharge <= 0));
+        // Slide must NOT fire on plain Shift — that stole vanilla sneak on Fabric.
+        // Default / Shift-bound: need Ctrl still held (sprint key) + Shift edge while moving.
+        boolean slidePulse = false;
+        if (cfg.slide && !data.proneLatch && data.mode == ParkourMode.NONE) {
+            if (!slideBound || MovesKeybinds.isShiftKey(MovesKeybinds.SLIDE)) {
+                slidePulse = shift && ctrl && !wasSneak
+                        && (sprinting || data.recentSprintTicks > 0)
+                        && !jump && data.jumpCharge <= 0;
+            } else {
+                slidePulse = slideKey && !data.prevSlideKey;
+            }
+        }
         data.prevSlideKey = slideKey;
         data.prevSneak = shift;
 

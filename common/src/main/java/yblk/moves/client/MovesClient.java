@@ -4,7 +4,7 @@ import yblk.moves.Constants;
 import yblk.moves.platform.Services;
 
 /**
- * Loads animation hooks only when Player Animator is actually installed.
+ * Loads animation hooks when Player Animator is present (installed or jar-in-jar).
  */
 public final class MovesClient {
 
@@ -12,15 +12,22 @@ public final class MovesClient {
     }
 
     public static void start() {
-        // Fabric uses id "player-animator", Forge uses "playeranimator".
-        if (!Services.PLATFORM.isModLoaded("playeranimator")
-                && !Services.PLATFORM.isModLoaded("player-animator")) {
+        boolean listed = Services.PLATFORM.isModLoaded("playeranimator")
+                || Services.PLATFORM.isModLoaded("player-animator");
+        boolean classesPresent;
+        try {
+            Class.forName("dev.kosmx.playerAnim.minecraftApi.PlayerAnimationRegistry");
+            classesPresent = true;
+        } catch (ClassNotFoundException ignored) {
+            classesPresent = false;
+        }
+        if (!listed && !classesPresent) {
             Constants.LOG.info("Player Animator is not installed; parkour poses are skipped.");
             return;
         }
         try {
             Class.forName("yblk.moves.client.MovesAnimationHooks").getMethod("register").invoke(null);
-            Constants.LOG.info("Player Animator hooks registered.");
+            Constants.LOG.info("Player Animator hooks registered (modListed={}, classes={})", listed, classesPresent);
         } catch (ReflectiveOperationException exception) {
             Constants.LOG.error("Could not register Player Animator hooks", exception);
         }

@@ -42,7 +42,8 @@ public final class PickCracks {
                 hands = below;
             }
         }
-        float y = 0.62F;
+        // Pick swing hits ~hand height; 6px (6/16) below the old mark lines up with the head.
+        float y = 0.62F - 6.0F / 16.0F;
         int variant = Math.floorMod(nextVariant++, VARIANTS);
         MARKS.add(new Mark(hands.immutable(), face, y, leftHand ? 0.24F : -0.24F, variant, level.getGameTime()));
         if (MARKS.size() > 24) {

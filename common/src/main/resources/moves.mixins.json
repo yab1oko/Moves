@@ -17,7 +17,8 @@
         "LocalPlayerMixin",
         "GuiStaminaMixin",
         "MinecraftGrabMixin",
-        "HeldItemRollMixin"
+        "HeldItemRollMixin",
+        "KeyMappingAccessor"
     ],
     "server": [
     ],

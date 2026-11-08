@@ -9,7 +9,7 @@ public final class ParkourTuning {
     public static final float MAX_STAMINA = 100.0F;
 
     /** Pure sprint empties the bar in about 20 seconds. */
-    public static final float SPRINT_DRAIN = 0.25F;
+    public static final float SPRINT_DRAIN = 0.12F;
     public static final float REGEN = 0.4F;
     public static final int REGEN_DELAY_TICKS = 20;
 
